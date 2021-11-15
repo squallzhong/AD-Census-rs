@@ -9,7 +9,7 @@ AD-Census是一个将局部算法和半全局算法相结合的算法，它包�
     3. 扫描线优化
     4. 视差优化
 
- 
+
 ### 示例运行
 ```
 cargo run --example example --release
