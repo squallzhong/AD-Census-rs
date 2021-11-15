@@ -1,33 +1,30 @@
-use std::{
-	ffi::NulError,
-	fmt,
-};
+use std::{ffi::NulError, fmt};
 
 #[derive(Debug)]
 pub struct Error {
-	pub code: i32,
-	pub message: String,
+    pub code: i32,
+    pub message: String,
 }
 
 impl Error {
-	pub fn new(code: i32, message: &str) -> Self {
-		Self { 
-            code: code, 
-            message: message.to_string()
+    pub fn new(code: i32, message: &str) -> Self {
+        Self {
+            code: code,
+            message: message.to_string(),
         }
-	}
+    }
 }
 
 impl fmt::Display for Error {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{} (code: {})", self.message, self.code)
-	}
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} (code: {})", self.message, self.code)
+    }
 }
 
 impl From<NulError> for Error {
-	fn from(_: NulError) -> Self {
-		Self::new(1000, ERROR_1000.into())
-	}
+    fn from(_: NulError) -> Self {
+        Self::new(1000, ERROR_1000.into())
+    }
 }
 
 impl std::error::Error for Error {}

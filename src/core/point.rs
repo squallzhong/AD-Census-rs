@@ -5,7 +5,7 @@ pub struct Point {
     #[getset(get = "pub", set = "pub")]
     x: usize,
     #[getset(get = "pub", set = "pub")]
-    y: usize
+    y: usize,
 }
 impl Point {
     pub fn new(x: usize, y: usize) -> Self {

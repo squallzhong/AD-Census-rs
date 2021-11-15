@@ -2,21 +2,19 @@ extern crate image;
 
 use std::sync::{Arc, Mutex};
 
-use image::{RgbImage};
+use image::RgbImage;
 
-use crate::error::{self, Error, Result};
 use crate::core::{ADCensusOption, CrossArm, Point};
-use crate::utils::{hamming_distance, pixel_distance, to_disparity_image};
+use crate::error::{self, Error, Result};
+use crate::utils::{hamming_distance, pixel_distance};
 
 use getset::{CopyGetters, Getters, MutGetters, Setters};
-use ndarray::{prelude::*, parallel::prelude::*, Zip};
+use ndarray::{parallel::prelude::*, prelude::*, Zip};
 use ndarray_stats::QuantileExt;
 use ndhistogram::{axis::Uniform, ndhistogram, Histogram};
-use nshare::{ToNdarray3};
+use nshare::ToNdarray3;
 
 use log::{debug, error, trace};
-
-
 
 /// ## 根据十字交叉臂进行代价聚合
 /// 代价聚合是将支持区的代价值累加，再除以支持区的像素数量，也就是计算支持区代价的均值，赋给中心像素的代价值
@@ -98,14 +96,13 @@ fn aggregate_cost_with_arm(
     ret
 }
 
-
 /// 边缘检测 - Sobel算子
 /**
  * Sobel算子是一种用于边缘检测的离散微分算子，它结合了高斯平滑和微分求导。
  * 该算子用于计算图像明暗程度近似值，根据图像边缘旁边明暗程度把该区域内超过某个数的特定点记为边缘。
  * Sobel算子在Prewitt算子的基础上增加了权重的概念，认为相邻点的距离远近对当前像素点的影响是不同的，
  * 距离越近的像素点对应当前像素的影响越大，从而实现图像锐化并突出边缘轮廓。
- * 
+ *
  * Sobel算子根据像素点上下、左右邻点灰度加权差，在边缘处达到极值这一现象检测边缘。
  * 对噪声具有平滑作用，提供较为精确的边缘方向信息。
  * 因为Sobel算子结合了高斯平滑和微分求导（分化），因此结果会具有更多的抗噪性，
@@ -121,18 +118,21 @@ fn aggregate_cost_with_arm(
 fn edge_detect_with_sobel(source: &ArrayView2<f32>, threshold: f32) -> Array2<bool> {
     let (height, width) = source.dim();
     let mut ret = Array2::<bool>::default((height, width));
-    Zip::indexed(&mut ret)
-    .par_for_each(|(y, x), ret_val|{
-        if y == 0 || y == height - 1  || x == 0 || x ==  width - 1{
+    Zip::indexed(&mut ret).par_for_each(|(y, x), ret_val| {
+        if y == 0 || y == height - 1 || x == 0 || x == width - 1 {
             return;
         }
         // 以当前像素为中心做 3x3 的切片
-        let p = source.slice(s![y-1..y+2, x-1..x+2]);
-        let p:Vec<f32> = p.iter().map(|x| if x.is_nan() {0f32} else {*x}).collect();
-        let grad = (
-            (p[6] + 2f32*p[7] + p[8]) - (p[0] + 2f32*p[1] + p[2]) - 
-            (p[2] + 2f32*p[5] + p[8]) - (p[0] + 2f32*p[3] + p[6])
-        ).abs();
+        let p = source.slice(s![y - 1..y + 2, x - 1..x + 2]);
+        let p: Vec<f32> = p
+            .iter()
+            .map(|x| if x.is_nan() { 0f32 } else { *x })
+            .collect();
+        let grad = ((p[6] + 2f32 * p[7] + p[8])
+            - (p[0] + 2f32 * p[1] + p[2])
+            - (p[2] + 2f32 * p[5] + p[8])
+            - (p[0] + 2f32 * p[3] + p[6]))
+            .abs();
         if grad > threshold {
             *ret_val = true;
         }
@@ -186,10 +186,7 @@ impl ADCensus {
         if width <= 0 || height <= 0 {
             return Err(Error::new(1001, error::ERROR_1001));
         }
-        let mut ret = Self::default()
-            .set_width(width)
-            .set_height(height)
-            .build();
+        let mut ret = Self::default().set_width(width).set_height(height).build();
         if let Some(v) = option {
             ret.set_option(v);
         }
@@ -812,7 +809,11 @@ impl ADCensus {
         self.disparity_right = disparity_right;
     }
     /// 立体匹配
-    pub fn matching(&mut self, left_image: &RgbImage, right_image: &RgbImage) -> Result<(ArrayView2<f32>,ArrayView2<f32>)> {
+    pub fn matching(
+        &mut self,
+        left_image: &RgbImage,
+        right_image: &RgbImage,
+    ) -> Result<(ArrayView2<f32>, ArrayView2<f32>)> {
         // 立体匹配的图像不能为空
         if left_image.width() * left_image.height() <= 0
             || right_image.width() * right_image.height() <= 0
@@ -936,75 +937,72 @@ impl ADCensus {
             self.iterative_region_voting(&mut mismatches.view_mut(), &mut occlusions.view_mut());
             // 过滤掉已处理的误匹配像素(像素坐标(0, 0))
             mismatches = Array1::from_vec(
-                mismatches.into_par_iter()
-                // 过滤像素坐标为 (0, 0)
-                .filter(|p| p.x() > &0 && p.y() > &0)
-                .map(|p| *p)
-                .collect::<Vec<_>>()
+                mismatches
+                    .into_par_iter()
+                    // 过滤像素坐标为 (0, 0)
+                    .filter(|p| p.x() > &0 && p.y() > &0)
+                    .map(|p| *p)
+                    .collect::<Vec<_>>(),
             );
-             // 过滤掉已处理的遮挡像素(像素坐标(0, 0))
+            // 过滤掉已处理的遮挡像素(像素坐标(0, 0))
             occlusions = Array1::from_vec(
-                occlusions.into_par_iter()
-                // 过滤像素坐标为 (0, 0)
-                .filter(|p| p.x() > &0 && p.y() > &0)
-                .map(|p| *p)
-                .collect::<Vec<_>>()
+                occlusions
+                    .into_par_iter()
+                    // 过滤像素坐标为 (0, 0)
+                    .filter(|p| p.x() > &0 && p.y() > &0)
+                    .map(|p| *p)
+                    .collect::<Vec<_>>(),
             );
             trace!(
                 "    [multistep_refiner] iterative region voting end. mismatches({}) occlusions({}).",
                 mismatches.dim(),
                 occlusions.dim()
             );
-        // 3. 内插填充
+            // 3. 内插填充
             self.proper_interpolation(&mut mismatches.view_mut(), &mut occlusions.view_mut());
-            trace!(
-                "    [multistep_refiner] proper interpolation end. "
-            );
+            trace!("    [multistep_refiner] proper interpolation end. ");
         }
         // 4. 深度非连续区视差调整
-        if self.option().do_discontinuity_adjustment()  == &true {
+        if self.option().do_discontinuity_adjustment() == &true {
             self.depth_discontinuity_adjustment();
-            trace!(
-                "    [multistep_refiner] depth discontinuity adjustment end. "
-            );
+            trace!("    [multistep_refiner] depth discontinuity adjustment end. ");
         }
         // 5. 中值滤波
     }
     /// 深度非连续区视差调整
-    fn depth_discontinuity_adjustment(&mut self){
+    fn depth_discontinuity_adjustment(&mut self) {
         let disp_left = self.disparity_left.clone();
-        let edge = edge_detect_with_sobel(
-            &disp_left.view(), 5.0f32
-        );
+        let edge = edge_detect_with_sobel(&disp_left.view(), 5.0f32);
         let (_, width) = disp_left.dim();
         let costs = self.cost_vals.view();
         Zip::indexed(&edge)
-        .and(&mut self.disparity_left.view_mut())
-        .par_for_each(|(y, x), edge_val, disp_val|{
-            if edge_val == &false || disp_val.is_nan() == true || x < 1 || x > width - 1 {
-                return;
-            }
-            let d = disp_val.round() as usize;
-            let cost = costs.get((y, x, d)).unwrap();
-            // 记录左右两边像素的视差值和代价值
-            // 选择代价最小的像素视差值
-            for k in 0..2{
-                let xx = if k == 0 { x - 1} else { x + 1};
-                let dd = disp_left.get((y, xx)).unwrap();
-                if dd.is_nan() {
-                    continue;
+            .and(&mut self.disparity_left.view_mut())
+            .par_for_each(|(y, x), edge_val, disp_val| {
+                if edge_val == &false || disp_val.is_nan() == true || x < 1 || x > width - 1 {
+                    return;
                 }
-                let tmp_depth = dd.round() as usize;
-                let cc = *costs.get((y, xx , tmp_depth)).unwrap();
-                if *cost > cc {
-                    //*cost = cc;
-                    *disp_val = *dd;
+                let d = disp_val.round() as usize;
+                let cost = costs.get((y, x, d)).unwrap();
+                // 记录左右两边像素的视差值和代价值
+                // 选择代价最小的像素视差值
+                for k in 0..2 {
+                    let xx = if k == 0 { x - 1 } else { x + 1 };
+                    let dd = disp_left.get((y, xx)).unwrap();
+                    if dd.is_nan() {
+                        continue;
+                    }
+                    let tmp_depth = dd.round() as usize;
+                    let cc = *costs.get((y, xx, tmp_depth)).unwrap();
+                    if *cost > cc {
+                        //*cost = cc;
+                        *disp_val = *dd;
+                    }
                 }
-            }
-        });
+            });
     }
     /// 内插填充
-    fn proper_interpolation(&mut self,
+    fn proper_interpolation(
+        &mut self,
         mismatches: &mut ArrayViewMut1<Point>,
         occlusions: &mut ArrayViewMut1<Point>,
     ) {
@@ -1013,13 +1011,13 @@ impl ADCensus {
         let height = *self.height() as usize;
         let disp_max = *self.option().cross_l1() as u32;
         for k in 0..2 {
-            let process_pixels = if k==0 {
+            let process_pixels = if k == 0 {
                 mismatches.view_mut()
             } else {
                 occlusions.view_mut()
             };
-            let mut valid_points:Vec<(f32, Point)> = Vec::new();
-            let mut valid_points_val:Vec<f32> = Vec::new();
+            let mut valid_points: Vec<(f32, Point)> = Vec::new();
+            let mut valid_points_val: Vec<f32> = Vec::new();
             let mut ang = 0f32;
             Zip::indexed(process_pixels).for_each(|_, p| {
                 let pos_y = *p.y();
@@ -1039,12 +1037,12 @@ impl ADCensus {
                         }
                         match self.disparity_left.get((yy, xx)) {
                             Some(v) => {
-                                if v.is_nan() == false && !valid_points_val.contains(v){
+                                if v.is_nan() == false && !valid_points_val.contains(v) {
                                     valid_points_val.push(*v);
                                     valid_points.push((*v, Point::new(xx, yy)));
                                     break;
                                 }
-                            },
+                            }
                             _ => {}
                         }
                     }
@@ -1056,7 +1054,7 @@ impl ADCensus {
                     //排序从小到大
                     valid_points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
                 }
-                
+
                 // 如果是误匹配区，则选择颜色最相近的像素视差值
                 // 如果是遮挡区，则选择最小视差值
                 let d = self.disparity_left.get_mut((pos_y, pos_x)).unwrap();
@@ -1064,13 +1062,14 @@ impl ADCensus {
                     let pixel_color_target = self.image_source_left.slice(s![pos_y, pos_x, ..]);
                     let pixel_color_target = pixel_color_target.as_slice().unwrap();
                     let mut min_dist = 999f32;
-                    for i in 0.. valid_points.len() {
+                    for i in 0..valid_points.len() {
                         let (d, p) = valid_points[i];
-                        let pixel_color_current = self.image_source_left.slice(
-                            s![*p.y(), *p.x(), ..]
-                        );
+                        let pixel_color_current =
+                            self.image_source_left.slice(s![*p.y(), *p.x(), ..]);
                         let pixel_color_current = pixel_color_current.as_slice().unwrap();
-                        if ((pixel_distance(pixel_color_target, pixel_color_current)) as f32) < min_dist {
+                        if ((pixel_distance(pixel_color_target, pixel_color_current)) as f32)
+                            < min_dist
+                        {
                             min_dist = d;
                         }
                     }
@@ -1097,7 +1096,7 @@ impl ADCensus {
         let disp_max = *self.option().max_disparity() as f32;
         for _ in 0..5 {
             for k in 0..2 {
-                let process_pixels = if k==0 {
+                let process_pixels = if k == 0 {
                     mismatches.view_mut()
                 } else {
                     occlusions.view_mut()
@@ -1113,7 +1112,9 @@ impl ADCensus {
                     //获取十字交叉臂区域
                     let (left, right) = arm.horizontal_arm_range();
                     let (top, bottom) = arm.vertical_arm_range();
-                    let disp_area = self.disparity_left.slice_mut(s![*top..*bottom, *left..*right]);
+                    let disp_area = self
+                        .disparity_left
+                        .slice_mut(s![*top..*bottom, *left..*right]);
                     //构建直方图
                     let mut hist = ndhistogram!(
                         Uniform::new(disp_max as usize, 0f32, disp_max);u32

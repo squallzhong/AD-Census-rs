@@ -5,7 +5,7 @@ use ad_census::utils;
 use log::{debug, error, info, trace};
 pub fn main() {
     // 初始化日志
-    utils::init_log("info");
+    utils::init_log("trace");
     //info!("日志初始化完成!");
     let limg = image::open("images/left.png").unwrap().to_rgb8();
     let rimg = image::open("images/right.png").unwrap().to_rgb8();
@@ -23,11 +23,7 @@ pub fn main() {
         .set_do_discontinuity_adjustment(true)
         .build();
 
-    let mut stereo = ad_census::ADCensus::new(
-        limg.width(),
-        limg.height(),
-        Some(option)
-    ).unwrap();
+    let mut stereo = ad_census::ADCensus::new(limg.width(), limg.height(), Some(option)).unwrap();
     let mut sw = stopwatch::Stopwatch::start_new();
     let (disp_left, disp_right) = stereo.matching(&limg, &rimg).unwrap();
     info!("matching elapse time: {}ms", sw.elapsed_ms());
@@ -41,7 +37,7 @@ pub fn main() {
         .save("display-right.png")
         .unwrap();
     debug!(
-    "[match] save disparity image. elapse time: {}ms",
-    sw.elapsed_ms()
-);
+        "[match] save disparity image. elapse time: {}ms",
+        sw.elapsed_ms()
+    );
 }

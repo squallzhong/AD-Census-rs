@@ -104,8 +104,8 @@ mod tests {
 
     #[test]
     fn test_pixel_distance() {
-        let color1:[u8;3] = [54,8,238];
-        let color2:[u8;3] = [29,29,32];
+        let color1: [u8; 3] = [54, 8, 238];
+        let color2: [u8; 3] = [29, 29, 32];
         assert_eq!(pixel_distance(&color1, &color2), 206);
     }
 }

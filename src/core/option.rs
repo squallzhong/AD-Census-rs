@@ -53,7 +53,7 @@ pub struct ADCensusOption {
     do_filling: bool,
     /// 是否做非连续区调整
     #[getset(get = "pub", set = "pub")]
-    do_discontinuity_adjustment: bool
+    do_discontinuity_adjustment: bool,
 }
 
 impl Default for ADCensusOption {
@@ -75,7 +75,7 @@ impl Default for ADCensusOption {
             lrcheck_thres: 1.0,
             do_lr_check: true,
             do_filling: true,
-            do_discontinuity_adjustment: true
+            do_discontinuity_adjustment: true,
         }
     }
 }
@@ -83,12 +83,12 @@ impl Default for ADCensusOption {
 impl ADCensusOption {
     pub fn new(min_disparity: i32, max_disparity: i32) -> Self {
         let mut r = ADCensusOption::default();
-        r.min_disparity = if min_disparity < 0 {0} else {min_disparity};
+        r.min_disparity = if min_disparity < 0 { 0 } else { min_disparity };
         r.max_disparity = max_disparity;
         r
     }
     ///
-    pub fn build(&self) -> Self{
+    pub fn build(&self) -> Self {
         *self
     }
 }
